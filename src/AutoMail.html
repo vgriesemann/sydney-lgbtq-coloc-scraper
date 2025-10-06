@@ -1,0 +1,69 @@
+<table style="width:100%; background:#f5f7fa; padding:24px; font-family:Inter,Arial,sans-serif;">
+  <tr>
+    <td style="max-width:650px; margin:auto; background:white; border-radius:14px; box-shadow:0 4px 12px rgba(0,0,0,0.08); overflow:hidden;">
+
+      <!-- HEADER -->
+      <div style="background:linear-gradient(135deg,#8b5cf6,#3b82f6); color:white; text-align:center; padding:22px;">
+        <h1 style="margin:0; font-size:20px;">🏳️‍🌈 Sydney Housing Watch</h1>
+        <p style="margin:6px 0 0; font-size:14px; opacity:0.9;">Powered by DigiVal Consulting</p>
+      </div>
+
+      <!-- CONTENT -->
+      <div style="padding:24px;">
+        <h2 style="font-size:22px; margin-top:0; color:#111; font-weight:700;">
+          {{openai_subject}} 🏡
+        </h2>
+
+        <!-- LOCATION + PRICE -->
+        <p style="font-size:15px; color:#333; margin:8px 0 16px; line-height:1.6;">
+          📍 
+          <a href="https://www.google.com/maps/search/{{Quartier}},+Sydney,+Australia" 
+             style="color:#007aff; text-decoration:none; font-weight:600;">
+             {{Quartier}}
+          </a> — {{price_per_week}} AUD/week 
+          <span style="color:#999;">(~{{price_per_month_aud}} AUD / {{price_per_month_eur}} € /month)</span><br>
+          🗓️ Posted {{date_posted}}<br>
+          🌈 <em>{{tags}}</em>
+        </p>
+
+        <!-- SUMMARY -->
+        <p style="font-size:15px; line-height:1.6; color:#444; margin-bottom:20px;">{{summary}}</p>
+
+        <hr style="margin:24px 0; border:none; border-top:1px solid #eee;">
+
+        <!-- WHY -->
+        <p style="font-size:15px; color:#555; line-height:1.6; margin-bottom:24px;">
+          <strong>Why it stands out:</strong><br>
+          {{reasoning}}
+        </p>
+
+        <!-- BUTTONS -->
+        <div style="display:flex; flex-wrap:wrap; gap:14px; justify-content:center;">
+          <a href="{{url}}" 
+             style="flex:1; min-width:140px; text-align:center; background:#111; color:white; padding:12px 18px; border-radius:8px; text-decoration:none; font-weight:600;">
+            🔗 View Listing
+          </a>
+          <a href="mailto:{{contact_email}}?subject=Interested in your room&body=Hi, I just saw your ad in {{Quartier}}!" 
+             style="flex:1; min-width:140px; text-align:center; background:#007aff; color:white; padding:12px 18px; border-radius:8px; text-decoration:none; font-weight:600;">
+            ✉️ Contact Owner
+          </a>
+        </div>
+      </div>
+
+      <!-- SIMILAR LISTINGS -->
+      <hr style="margin:32px 0; border:none; border-top:1px solid #eee;">
+      <h3 style="font-size:18px; color:#111; padding:0 24px;">🌈 You may also like:</h3>
+
+      <table style="width:100%; border-spacing:0; margin-top:12px; padding:0 24px;">
+        {{similar_listings}}
+      </table>
+
+      <!-- FOOTER -->
+      <div style="background:#f3f3f3; padding:16px; text-align:center; font-size:13px; color:#777;">
+        Sent automatically by <strong>DigiVal Consulting</strong> · Sydney Housing Watch 🌈<br>
+        <a href="https://digival.consulting" style="color:#999;">digival.consulting</a>
+      </div>
+
+    </td>
+  </tr>
+</table>
