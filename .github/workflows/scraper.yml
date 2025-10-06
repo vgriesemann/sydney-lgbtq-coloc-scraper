@@ -1,0 +1,50 @@
+```yaml
+name: LGBTQ+ Sydney Colocation Scraper
+
+on:
+  schedule:
+    # Toutes les 25 minutes, heures de pointe (8h-20h), lundi-vendredi
+    - cron: '*/25 8-20 * * 1-5'
+    # Toutes les 4 heures la nuit (21h-7h)
+    - cron: '0 */4 21-7 * * *'
+    # Toutes les 8 heures le weekend
+    - cron: '0 */8 * * 6,0'
+  
+  # Permet de lancer manuellement
+  workflow_dispatch:
+
+jobs:
+  scrape-and-analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install requests beautifulsoup4 openai python-dotenv telegram-bot-api
+        
+    - name: Run LGBTQ+ Scraper
+      env:
+        NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: python src/main.py
+      
+    - name: Upload logs if error
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: error-logs
+        path: logs/
+        retention-days: 3
+```
