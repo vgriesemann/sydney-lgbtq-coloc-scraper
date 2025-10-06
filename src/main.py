@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 LGBTQ+ Sydney Flatshare Scraper
-Automated system for finding LGBTQ+ flatshare listings in Sydney.
+Automated search system for LGBTQ+ flatshare ads in Sydney
 """
 
 import os
@@ -10,13 +10,12 @@ import re
 import time
 import json
 import hashlib
-import requests
 import random
+import requests
 from datetime import datetime
 from typing import Dict, List
-from bs4 import BeautifulSoup
 
-# --- Configuration ---
+# === CONFIGURATION ===
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -32,96 +31,53 @@ class LGBTQColocScraper:
             "Notion-Version": "2022-06-28",
         }
 
-        # LGBTQ+ detection patterns
         self.lgbtq_patterns = [
             r"(?i)lgbtq?\+?",
             r"(?i)queer[-\s]?friendly",
-            r"(?i)queer\s*house(hold)?",
             r"(?i)gay[-\s]?share",
             r"(?i)gay[-\s]?friendly",
-            r"(?i)lesbian[-\s]?friendly",
-            r"(?i)trans[-\s]?friendly",
             r"(?i)rainbow\s*(home|house|household)",
         ]
 
-        # Nationality detection patterns
         self.nationality_patterns = {
             "Australian": r"(?i)\b(aussies?|australian[s]?)\b",
-            "Brazilian": r"(?i)\b(brazil(ian)?s?|portuguese\s*(speaker|speaking)|portugu(e|ê)s)\b",
+            "Brazilian": r"(?i)\b(brazil(ian)?s?|portuguese)\b",
         }
 
         self.target_suburbs = ["Surry Hills", "Darlinghurst", "Newtown"]
 
-    def log(self, message: str):
-        """Simple logger"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{timestamp}] {message}")
+    def log(self, msg: str):
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
 
+    # === CORE ANALYSIS ===
     def detect_lgbtq_content(self, text: str) -> bool:
-        """Detect LGBTQ+ content"""
-        return any(re.search(pattern, text) for pattern in self.lgbtq_patterns)
+        return any(re.search(p, text) for p in self.lgbtq_patterns)
 
     def extract_nationalities(self, text: str) -> List[str]:
-        """Extract nationalities"""
         found = []
-        for nationality, pattern in self.nationality_patterns.items():
-            if re.search(pattern, text):
-                found.append(nationality)
+        for n, p in self.nationality_patterns.items():
+            if re.search(p, text):
+                found.append(n)
         return found
 
-    def generate_hash(self, listing: Dict) -> str:
-        """Generate hash for deduplication"""
-        key = f"{listing['title']}|{listing['price_per_week']}|{listing['suburb']}|{listing['date_posted']}"
-        return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
-
-    def search_notion_duplicate(self, url: str) -> bool:
-        """Check if URL already exists in Notion"""
-        query_data = {"filter": {"property": "URL", "url": {"equals": url}}}
-
-        try:
-            response = requests.post(
-                f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query",
-                headers=self.notion_headers,
-                json=query_data,
-            )
-
-            if response.status_code == 200:
-                results = response.json().get("results", [])
-                return len(results) > 0
-
-        except Exception as e:
-            self.log(f"Error while checking Notion duplicates: {e}")
-
-        return False
-
     def analyze_with_openai(self, listing: Dict) -> Dict:
-        """Analyze listing using OpenAI"""
+        """Analyse ad text with OpenAI"""
         prompt = f"""
-Analyze this Sydney flatshare listing and return a JSON object with this exact structure:
+Analyze this flatshare listing in Sydney and return a JSON object with this structure:
 {{
-    "summary": "2-3 sentence summary in English",
-    "lgbtq": true/false,
-    "nationalities": ["Australian", "Brazilian"],
-    "tags": ["ensuite", "bills included", "furnished"],
-    "score": 0-100,
-    "reasons": ["scoring rationale"]
+  "summary": "2-3 sentences summary in English",
+  "lgbtq": true/false,
+  "nationalities": ["Australian", "Brazilian"],
+  "tags": ["ensuite", "bills included", "furnished"],
+  "score": 0-100,
+  "reasons": ["why this score"]
 }}
 
-Listing data:
+Ad data:
 Title: {listing['title']}
 Description: {listing['description']}
 Price/week: ${listing['price_per_week']}
-Suburb: {listing['suburb']}
-
-Scoring rules:
-- Base: 50
-- +25 if LGBTQ+ explicit
-- +10 for premium suburbs (Surry Hills, Darlinghurst, Newtown)
-- +10 if Australians mentioned
-- +10 if Brazilians mentioned
-- +10 if ensuite/private bathroom
-- +10 if bills included
-- -20 if shared room
+Location: {listing['suburb']}
 """
 
         try:
@@ -134,188 +90,129 @@ Scoring rules:
                     "messages": [
                         {
                             "role": "system",
-                            "content": "You are an expert in LGBTQ+ flatshares in Sydney. Always respond in JSON only.",
+                            "content": "You are an assistant that evaluates LGBTQ+ flatshare ads in Sydney and outputs only valid JSON.",
                         },
                         {"role": "user", "content": prompt},
                     ],
-                    "temperature": 0.2,
-                    "max_tokens": 500,
+                    "temperature": 0.3,
                 },
             )
 
             if response.status_code == 200:
-                result = response.json()
-                analysis = json.loads(result["choices"][0]["message"]["content"])
+                data = response.json()
+                analysis = json.loads(data["choices"][0]["message"]["content"])
                 return analysis
 
         except Exception as e:
-            self.log(f"OpenAI error: {e}")
+            self.log(f"⚠️ OpenAI error: {e}")
 
-        # Fallback analysis
-        text = f"{listing['title']} {listing['description']}".lower()
-        score = 50
+        text = (listing["title"] + " " + listing["description"]).lower()
         lgbtq = self.detect_lgbtq_content(text)
-        if lgbtq:
-            score += 25
+        score = 50 + (25 if lgbtq else 0)
         if listing["suburb"] in self.target_suburbs:
             score += 10
-
         return {
             "summary": f"Flatshare in {listing['suburb']} for ${listing['price_per_week']}/week.",
             "lgbtq": lgbtq,
             "nationalities": self.extract_nationalities(text),
             "tags": [],
-            "score": min(100, max(0, score)),
-            "reasons": ["Fallback analysis - OpenAI failed"],
+            "score": min(100, score),
+            "reasons": ["Fallback analysis used"],
         }
 
+    # === NOTION INTEGRATION ===
     def create_notion_page(self, listing: Dict, analysis: Dict) -> bool:
-        """Create a page in Notion"""
+        """Send data to Notion"""
+
         page_data = {
             "parent": {"database_id": NOTION_DATABASE_ID},
             "properties": {
-                "Title": {"title": [{"text": {"content": listing["title"][:100]}}]},
-                "URL": {"url": listing["url"]},
+                "Ad Title": {"title": [{"text": {"content": listing["title"][:100]}}]},
                 "Source": {"select": {"name": listing["source"]}},
-                "Prix/sem.": {"number": listing["price_per_week"]},
-                "Quartier": {"select": {"name": listing["suburb"]}},
-                "Date annonce": {"date": {"start": listing["date_posted"]}},
-                "LGBTQ": {"checkbox": analysis["lgbtq"]},
-                "Nationalités": {
-                    "multi_select": [{"name": nat} for nat in analysis.get("nationalities", [])]
+                "Publish date": {"date": {"start": listing["date_posted"]}},
+                "Location": {"select": {"name": listing["suburb"]}},
+                "Rent/week": {"number": listing["price_per_week"]},
+                "Description": {
+                    "rich_text": [{"text": {"content": listing["description"][:1800]}}]
                 },
+                "Summary": {
+                    "rich_text": [{"text": {"content": analysis["summary"][:500]}}]
+                },
+                "Link": {"url": listing["url"]},
                 "Score": {"number": analysis["score"]},
-                "Tags": {
-                    "multi_select": [{"name": tag} for tag in analysis.get("tags", [])]
+                "Nationalities": {
+                    "multi_select": [{"name": n} for n in analysis.get("nationalities", [])]
                 },
-                "Statut": {"select": {"name": "Nouveau"}},
+                "Status": {"select": {"name": "new"}},
             },
-            "children": [
-                {
-                    "object": "block",
-                    "type": "paragraph",
-                    "paragraph": {
-                        "rich_text": [{"text": {"content": listing["description"][:2000]}}]
-                    },
-                },
-                {
-                    "object": "block",
-                    "type": "paragraph",
-                    "paragraph": {
-                        "rich_text": [{"text": {"content": f"✨ AI Summary: {analysis['summary']}"}}],
-                    },
-                },
-            ],
         }
 
         try:
-            response = requests.post(
+            res = requests.post(
                 "https://api.notion.com/v1/pages",
                 headers=self.notion_headers,
                 json=page_data,
             )
-
-            if response.status_code == 200:
-                self.log(f"✅ Created in Notion: {listing['title'][:50]}...")
+            if res.status_code == 200:
+                self.log(f"✅ Added to Notion: {listing['title']}")
                 return True
             else:
-                self.log(f"❌ Notion error: {response.status_code} - {response.text}")
-
+                self.log(f"❌ Notion error: {res.status_code} - {res.text}")
         except Exception as e:
-            self.log(f"❌ Error creating Notion page: {e}")
-
+            self.log(f"❌ Exception while pushing to Notion: {e}")
         return False
 
+    # === TELEGRAM ===
     def send_telegram_notification(self, listings: List[Dict]):
-        """Send Telegram notification"""
-        if not listings or not TELEGRAM_BOT_TOKEN:
+        if not TELEGRAM_BOT_TOKEN or not listings:
             return
-
-        message = f"🏳️‍🌈 {len(listings)} new LGBTQ+ flatshare ads in Sydney!\n\n"
-
-        for i, listing in enumerate(listings[:3]):
-            message += f"{i+1}. {listing['title'][:40]}...\n"
-            message += f"   📍 {listing['suburb']} - ${listing['price_per_week']}/week\n"
-            message += f"   🎯 Score: {listing['score']}/100\n"
-            message += f"   🔗 {listing['url']}\n\n"
-
-        if len(listings) > 3:
-            message += f"...and {len(listings)-3} more ads!"
-
+        message = f"🏳️‍🌈 {len(listings)} new LGBTQ+ flatshare ads!\n\n"
+        for ad in listings[:3]:
+            message += f"🏠 {ad['title'][:40]}...\n📍 {ad['suburb']} - ${ad['price_per_week']}/week\n🔗 {ad['url']}\n\n"
         try:
             requests.post(
                 f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                {
-                    "chat_id": TELEGRAM_CHAT_ID,
-                    "text": message,
-                    "parse_mode": "Markdown",
-                    "disable_web_page_preview": True,
-                },
+                data={"chat_id": TELEGRAM_CHAT_ID, "text": message},
             )
-            self.log(f"📱 Telegram notification sent: {len(listings)} listings")
-
+            self.log("📩 Telegram notification sent")
         except Exception as e:
-            self.log(f"❌ Telegram error: {e}")
+            self.log(f"⚠️ Telegram error: {e}")
 
-   def scrape_sample_listings(self) -> List[Dict]:
-    # Force some sample listings for testing
+    # === SAMPLE SCRAPER ===
+    def scrape_sample_listings(self) -> List[Dict]:
+        """Temporary fake scraper returning mock listings"""
         return [
-        {
-            "title": "Queer-friendly room in Surry Hills",
-            "description": "Private room with ensuite, LGBTQ+ flatmates, bills included.",
-            "url": "https://flatmates.com.au/listing/12345",
-            "price_per_week": 420,
-            "suburb": "Surry Hills",
-            "date_posted": datetime.now().strftime("%Y-%m-%d"),
-            "source": "Flatmates"
-        }
-    ]
+            {
+                "title": "Queer-friendly ensuite in Surry Hills",
+                "description": "Spacious room in a welcoming LGBTQ+ household, near Oxford Street. Bills included, fully furnished.",
+                "url": "https://flatmates.com.au/listing/12345",
+                "price_per_week": random.randint(350, 480),
+                "suburb": "Surry Hills",
+                "date_posted": datetime.now().strftime("%Y-%m-%d"),
+                "source": "Flatmates",
+            }
+        ]
 
-        hour = datetime.now().hour
-        num_listings = random.randint(0, 2) if 8 <= hour <= 20 else random.randint(0, 1)
-        return sample_listings[:num_listings]
-
+    # === MAIN RUN ===
     def run(self):
-        """Main execution"""
         self.log("🚀 Starting LGBTQ+ Sydney Scraper")
+        listings = self.scrape_sample_listings()
+        self.log(f"📦 {len(listings)} listing(s) retrieved")
 
-        raw_listings = self.scrape_sample_listings()
-        self.log(f"📦 {len(raw_listings)} listings retrieved")
-
-        if not raw_listings:
-            self.log("ℹ️ No new listings found")
-            return
-
-        processed_listings = []
-
-        for listing in raw_listings:
+        processed = []
+        for listing in listings:
             try:
-                if self.search_notion_duplicate(listing["url"]):
-                    self.log(f"⏭️ Duplicate ignored: {listing['title'][:30]}...")
-                    continue
-
-                self.log(f"🔍 Analyzing: {listing['title'][:30]}...")
+                self.log(f"🔍 Analyzing: {listing['title']}")
                 analysis = self.analyze_with_openai(listing)
-
-                if not analysis["lgbtq"] and listing["suburb"] not in self.target_suburbs:
-                    self.log(f"❌ Filtered out (not LGBTQ+): {listing['title'][:30]}...")
-                    continue
-
                 if self.create_notion_page(listing, analysis):
-                    processed_listings.append(
-                        {**listing, "score": analysis["score"], "lgbtq": analysis["lgbtq"]}
-                    )
-
+                    processed.append(listing)
                 time.sleep(random.uniform(2, 5))
-
             except Exception as e:
-                self.log(f"❌ Processing error: {e}")
-                continue
+                self.log(f"⚠️ Processing error: {e}")
 
-        if processed_listings:
-            self.send_telegram_notification(processed_listings)
-
-        self.log(f"✅ Done: {len(processed_listings)} listings added")
+        if processed:
+            self.send_telegram_notification(processed)
+        self.log(f"✅ Done. {len(processed)} listing(s) added.")
 
 
 if __name__ == "__main__":
