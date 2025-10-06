@@ -257,28 +257,19 @@ Scoring rules:
         except Exception as e:
             self.log(f"❌ Telegram error: {e}")
 
-    def scrape_sample_listings(self) -> List[Dict]:
-        """Simplified scraper with example listings"""
-        sample_listings = [
-            {
-                "title": "Private room in queer-friendly share house - Surry Hills",
-                "description": "Lovely private room with ensuite in a welcoming LGBTQ+ household. We're a mix of Australian and Brazilian flatmates who love to cook together! Close to Oxford Street and all the rainbow action. Bills included, fully furnished.",
-                "url": f"https://flatmates.com.au/listing/{random.randint(10000, 99999)}",
-                "price_per_week": random.randint(350, 450),
-                "suburb": random.choice(["Surry Hills", "Darlinghurst", "Newtown"]),
-                "date_posted": datetime.now().strftime("%Y-%m-%d"),
-                "source": "Flatmates",
-            },
-            {
-                "title": "Room in gay share house - Darlinghurst",
-                "description": "Gay-friendly share house in the heart of Darlinghurst. Private bathroom, close to train station. We're looking for a like-minded person to join our small household. Two current flatmates - one Aussie teacher, one international student from São Paulo.",
-                "url": f"https://gayshare.com.au/listing/{random.randint(10000, 99999)}",
-                "price_per_week": random.randint(380, 480),
-                "suburb": random.choice(["Darlinghurst", "Surry Hills"]),
-                "date_posted": datetime.now().strftime("%Y-%m-%d"),
-                "source": "Gay Share",
-            },
-        ]
+   def scrape_sample_listings(self) -> List[Dict]:
+    # Force some sample listings for testing
+    return [
+        {
+            "title": "Queer-friendly room in Surry Hills",
+            "description": "Private room with ensuite, LGBTQ+ flatmates, bills included.",
+            "url": "https://flatmates.com.au/listing/12345",
+            "price_per_week": 420,
+            "suburb": "Surry Hills",
+            "date_posted": datetime.now().strftime("%Y-%m-%d"),
+            "source": "Flatmates"
+        }
+    ]
 
         hour = datetime.now().hour
         num_listings = random.randint(0, 2) if 8 <= hour <= 20 else random.randint(0, 1)
