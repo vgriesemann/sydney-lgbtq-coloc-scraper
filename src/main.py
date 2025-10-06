@@ -143,7 +143,8 @@ Location: {listing['suburb']}
                 "Nationalities": {
                     "multi_select": [{"name": n} for n in analysis.get("nationalities", [])]
                 },
-                "Status": {"select": {"name": "new"}},
+                # 🟩 ✅ CORRECTION ICI : le type "status" est requis par Notion
+                "Status": {"status": {"name": "Not started"}},
             },
         }
 
