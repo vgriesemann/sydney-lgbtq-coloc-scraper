@@ -9,11 +9,11 @@ import os
 import re
 import time
 import json
-import hashlib
 import random
 import requests
 from datetime import datetime
 from typing import Dict, List
+from bs4 import BeautifulSoup
 
 # === CONFIGURATION ===
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
@@ -49,7 +49,23 @@ class LGBTQColocScraper:
     def log(self, msg: str):
         print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
 
-    # === CORE ANALYSIS ===
+    # === IMAGE FETCHER ===
+    def get_first_image_url(self, listing_url: str) -> str:
+        """Extract the first image URL from the listing page"""
+        try:
+            response = requests.get(listing_url, timeout=10)
+            if response.status_code != 200:
+                return None
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            img = soup.find("img", {"class": "listing-image"}) or soup.find("img")
+            if img and img.get("src"):
+                return img["src"]
+        except Exception as e:
+            self.log(f"⚠️ Error fetching image: {e}")
+        return None
+
+    # === ANALYSIS ===
     def detect_lgbtq_content(self, text: str) -> bool:
         return any(re.search(p, text) for p in self.lgbtq_patterns)
 
@@ -139,11 +155,11 @@ Location: {listing['suburb']}
                     "rich_text": [{"text": {"content": analysis["summary"][:500]}}]
                 },
                 "Link": {"url": listing["url"]},
+                "Image URL": {"url": listing.get("image_url")},
                 "Score": {"number": analysis["score"]},
                 "Nationalities": {
                     "multi_select": [{"name": n} for n in analysis.get("nationalities", [])]
                 },
-                # 🟩 ✅ CORRECTION ICI : le type "status" est requis par Notion
                 "Status": {"status": {"name": "Not started"}},
             },
         }
@@ -194,6 +210,32 @@ Location: {listing['suburb']}
             }
         ]
 
+    # === EMAIL GENERATION ===
+    def generate_html_email(self, listings):
+        html_blocks = []
+        for listing in listings:
+            html_blocks.append(f"""
+            <div style='border:1px solid #ddd; border-radius:8px; overflow:hidden; margin-bottom:20px;'>
+              <img src="{listing.get('image_url', '')}" style='width:100%; height:auto;'>
+              <div style='padding:16px;'>
+                <h3 style='margin-top:0;'>{listing['title']}</h3>
+                <p><strong>${listing['price_per_week']}/week</strong> · {listing['suburb']}</p>
+                <p>{listing.get('summary','')}</p>
+                <a href="{listing['url']}" style='color:#3366cc;'>View listing</a>
+              </div>
+            </div>
+            """)
+        html = f"""
+        <html><body style='font-family:Arial,sans-serif; background:#fafafa; padding:20px;'>
+          <h2>🏳️‍🌈 New LGBTQ+ Flatshare listings – {datetime.now().strftime('%B %d, %Y')}</h2>
+          {''.join(html_blocks)}
+          <p style='color:#999;font-size:12px;'>Generated automatically by your Sydney LGBTQ+ Scraper ✨</p>
+        </body></html>
+        """
+        with open("daily_digest.html", "w", encoding="utf-8") as f:
+            f.write(html)
+        self.log("📧 HTML email generated → daily_digest.html")
+
     # === MAIN RUN ===
     def run(self):
         self.log("🚀 Starting LGBTQ+ Sydney Scraper")
@@ -203,16 +245,19 @@ Location: {listing['suburb']}
         processed = []
         for listing in listings:
             try:
+                listing["image_url"] = self.get_first_image_url(listing["url"])
                 self.log(f"🔍 Analyzing: {listing['title']}")
                 analysis = self.analyze_with_openai(listing)
                 if self.create_notion_page(listing, analysis):
-                    processed.append(listing)
+                    processed.append({**listing, **analysis})
                 time.sleep(random.uniform(2, 5))
             except Exception as e:
                 self.log(f"⚠️ Processing error: {e}")
 
         if processed:
             self.send_telegram_notification(processed)
+            self.generate_html_email(processed)
+
         self.log(f"✅ Done. {len(processed)} listing(s) added.")
 
 
