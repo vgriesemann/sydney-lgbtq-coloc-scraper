@@ -259,7 +259,7 @@ Scoring rules:
 
    def scrape_sample_listings(self) -> List[Dict]:
     # Force some sample listings for testing
-    return [
+        return [
         {
             "title": "Queer-friendly room in Surry Hills",
             "description": "Private room with ensuite, LGBTQ+ flatmates, bills included.",
