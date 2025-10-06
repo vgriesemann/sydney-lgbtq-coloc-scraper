@@ -3,7 +3,6 @@ name: LGBTQ+ Sydney Flatshare Scraper
 on:
   workflow_dispatch:
   schedule:
-    # Every 30 minutes during daytime (8am–8pm)
     - cron: "*/30 8-20 * * 1-5"
 
 jobs:
@@ -23,7 +22,7 @@ jobs:
         run: |
           pip install requests beautifulsoup4 openai python-dotenv
 
-      - name: Run LGBTQ+ Sydney Scraper
+      - name: Run Scraper
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
